@@ -175,10 +175,11 @@ namespace Motion
             Trap(true, p_trap, setTrapParameter, axi);
         }
 
+        //常用于铺粉车
         public static void GoSafetyPosition(short axi, short card)
         {
             AxiCondition.AxiSituation axiSituation = new AxiCondition.AxiSituation();
-            axiSituation = AxiCondition.readCondition(axi, card);
+            axiSituation = AxiCondition.ReadCondition(axi, card);
             if (axiSituation.negativeLimit == true)
             {
                 mc.TTrapPrm p_trap = new mc.TTrapPrm();
@@ -203,7 +204,7 @@ namespace Motion
             }
         }
 
-        public static void readAxiDAC(short axi, short card)
+        public static void ReadAxiDAC(short axi, short card)
         {
             short sRtn;
             //电压值
@@ -220,7 +221,7 @@ namespace Motion
 
         }
 
-        public static void readDAC(short sartAdc, short card, short nCount)
+        public static void ReadDAC(short sartAdc, short card, short nCount)
         {
             short sRtn;
             // 电压值
@@ -235,7 +236,7 @@ namespace Motion
         }
 
         //通用输出IO高电平
-        public static void setDoHighLevel(short card,short Do)
+        public static void SetDoHighLevel(short card,short Do)
         {   short sRtn;
             sRtn = mc.GT_SetDoBit(card, 12, Do, 1);
             if (sRtn != 0)
@@ -245,7 +246,7 @@ namespace Motion
         }
 
         //通用输出IO低电平
-        public static void setDoLowLevel(short card, short Do)
+        public static void SetDoLowLevel(short card, short Do)
         {
             short sRtn;
             sRtn = mc.GT_SetDoBit(card, 12, Do, 0);

@@ -88,7 +88,7 @@ namespace ReadCondition
             return axiParameter;
         }
 
-        public static AxiSituation readCondition(short axi, short card)
+        public static AxiSituation ReadCondition(short axi, short card)
         {
             short bFlagAlarm = 0;           // 伺服报警标志
             short bFlagMError = 0;          // 跟随误差越限标志

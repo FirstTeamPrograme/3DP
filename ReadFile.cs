@@ -11,9 +11,39 @@ namespace ReadFile
 {
     class STL
     {
-        public List<CLI> STLFile;
-        public static CLI ReadCLI(FileStream myStream)
+        public class ThreeDimension
         {
+            public double x, y, z;
+        }
+
+        public class CLI
+        {
+            public int LayerNumber;//总层数
+            public string FileStyle;//文件风格二进制或ASCII
+            public double Units;//单位
+            public int Version;//版本号
+            public double LayerThickness;//层厚
+            public List<ThreeDimension> Dimension = new List<ThreeDimension>();//实体最小外接立方体的对角点（x，y，z）
+            public List<Layer> LayerLine = new List<Layer>();//层数据链表
+            public int StartLayer;//起始层数
+            public string PartType;//零件类型
+        }
+        public class Layer
+        {
+            public double z;//每层的高度
+            public List<Line> LineList = new List<Line>();//层线集合
+        }
+
+        public class Line
+        {
+            public int id, n, dir;//id模型，n:munber of points,dir:direction of counter
+            public List<MyPoint> Polygon = new List<MyPoint>();//counter
+
+        }
+        public static List<CLI> STLFile;
+        public static CLI ReadCLI(string FilePath)
+        {
+            FileStream myStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read);
             CLI Cli = new CLI();
             BinaryReader reader = new BinaryReader(myStream);
             string str = "";
@@ -82,9 +112,7 @@ namespace ReadFile
                             break;
                         }
                     }
-
                 }
-
                 else if (strName == "$$DIMEN")
                 {
                     for (int i = 0; i < str.Length; i++)
@@ -117,7 +145,6 @@ namespace ReadFile
                                         p.x = Convert.ToDouble(unt);
                                         unt = "";
                                         f++;
-                                        //break;
                                     }
                                     else if (f % 3 == 1)
                                     {
@@ -125,8 +152,6 @@ namespace ReadFile
                                         p.y = Convert.ToDouble(unt);
                                         unt = "";
                                         f++;
-
-                                        // break;
                                     }
                                     else if (f % 3 == 2)
                                     {
@@ -177,7 +202,41 @@ namespace ReadFile
             { Cli.LayerThickness = Cli.LayerLine[1].z - Cli.LayerLine[0].z; }
             else
             { Cli.LayerThickness = Cli.LayerLine[0].z; }
+
+            DealCLI(Cli);
+            SetCliPartType(Cli);
             return Cli;
+        }
+
+        public static void SetCliPartType(CLI cli)
+        {
+            for (int i=0;i<cli.LayerNumber;i++)
+            {
+                for (int j=0;j< cli.LayerLine[i].LineList.Count;j++)
+                {
+                    if (cli.LayerLine[i].LineList[j].dir==2)
+                    { cli.PartType = "Brace";
+                        return ;
+                    }
+                }
+            }
+            cli.PartType = "Substance";
+        }
+
+        public static void DealCLI(CLI Cli)
+        {
+            for (int c = 0; c < Cli.LayerNumber; c++)
+            {
+                for (int L = 0; L < Cli.LayerLine[c].LineList.Count; L++)
+                {
+                    if (Cli.LayerLine[c].LineList[L].dir != 2)
+                    {
+                        Line line = Cli.LayerLine[c].LineList[L];
+                        DealSurplus(line);
+                        Cli.LayerLine[c].LineList[L] = line;
+                    }
+                }
+            }
         }
 
         public static Layer ReadOneLayer(long position, FileStream myStream, double Unint)
@@ -218,7 +277,7 @@ namespace ReadFile
                         Lp.y = reader.ReadInt16() * Unint;
                         Oneline.Add(Lp);
                     }
-                    line.Lines.Add(Oneline);
+                    line.Polygon = Oneline;
                     layer.LineList.Add(line);
                     poa = myStream.Position;
                 }
@@ -231,33 +290,82 @@ namespace ReadFile
             }
             return layer;
         }
-    }
-    class ThreeDimension
-    {
-        public double x, y, z;
+
+        public static void DealSurplus(Line Ln)
+        {
+            bool Fg = true;
+            while (Fg)
+            {
+                Fg = false;
+                int n = Ln.Polygon.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    if (SamePoint(Ln.Polygon[i], Ln.Polygon[(i + 1) % n]) && n > 1)
+                    {
+                        DeletePoint(Ln, i);
+                        Fg = true;
+                        break;
+                    }
+                    else if (TreeOneLine(Ln.Polygon[i], Ln.Polygon[(i + 1) % n], Ln.Polygon[(i + 2) % n]) && n > 2)
+                    {
+                        DeletePoint(Ln, (i + 1) % n);
+                        Fg = true;
+                        break;
+                    }
+                    else { }
+                }
+            }
+            Ln.n = Ln.Polygon.Count;
+        }
+
+        public static bool TreeOneLine(MyPoint one, MyPoint Two, MyPoint Three)
+        {
+            MyPoint OneTwo = new MyPoint();
+            OneTwo.x = Two.x - one.x;
+            OneTwo.y = Two.y - one.y;
+            double ZTwo = Math.Sqrt(OneTwo.y * OneTwo.x + OneTwo.y * OneTwo.y);
+
+            MyPoint OneThree = new MyPoint();
+            OneThree.x = Three.x - one.x;
+            OneThree.y = Three.y - one.y;
+
+            double ZThree = Math.Sqrt(OneThree.x * OneThree.x + OneThree.y * OneThree.y);
+            double Cha = (OneTwo.x * OneThree.y - OneTwo.y * OneThree.x) / (ZTwo * ZThree);
+
+            if (Math.Abs(Cha) < 0.01)
+            { return true; }
+            else
+            { return false; }
+        }
+
+        public static bool SamePoint(MyPoint p, MyPoint p1)
+        {
+            double x = p1.x - p.x;
+            double y = p1.y - p.y;
+            double L = Math.Sqrt(x * x + y * y);
+
+            if (L <= 0.01)
+            {
+
+                return true;
+            }
+            else { return false; }
+        }
+
+        public static void DeletePoint(Line line, int i)
+        {
+            int n = line.Polygon.Count;
+            List<MyPoint> Poly = new List<MyPoint>();
+            var LINE = line.Polygon;
+            for (int m = 0; m < n; m++)
+            {
+                if (m != i)
+                { Poly.Add(LINE[m]); }
+            }
+            line.Polygon = Poly;
+            line.n = Poly.Count;
+        }
     }
 
-    class CLI
-    {
-        public int LayerNumber;//总层数
-        public string FileStyle;//文件风格二进制或ASCII
-        public double Units;//单位
-        public int Version;//版本号
-        public double LayerThickness;//层厚
-        public List<ThreeDimension> Dimension = new List<ThreeDimension>();//实体最小外接立方体的对角点（x，y，z）
-        public List<Layer> LayerLine = new List<Layer>();//层数据链表
-    }
-    class Layer
-    {
-        public double z;//每层的高度
-        public List<Line> LineList = new List<Line>();//层线集合
-    }
-
-    class Line
-    {
-        public int id, n, dir;//id模型，n:munber of points,dir:direction of counter
-        public List<List<MyPoint>> Lines = new List<List<MyPoint>>();//counter
-
-    }
 
 }
